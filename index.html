@@ -152,7 +152,7 @@ let bleDevice, bleCharacteristic;
 
 // --- DATA SEED (This part is updated automatically on Save) ---
 let items = JSON.parse(localStorage.getItem('m4t_items')) || [{"id":1,"n":"ນ້ຳດື່ມ","p":5000,"c":"ເຄື່ອງດື່ມ","img":"https://images.unsplash.com/photo-1548919973-5dea5846f669?w=150"},{"id":2,"n":"ກາເຟ","p":25000,"c":"ເຄື່ອງດື່ມ","img":"https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=150"}];
-let shop = JSON.parse(localStorage.getItem('m4t_shop')) || { n: "M4T POS SHOP", t: "ບ້ານດອນດູ່ | 020 9787 0611", q: "" };
+let shop = JSON.parse(localStorage.getItem('m4t_shop')) || { n: "M4T POS", t: "ຮ້ານຄ້າ | 020 1234 5678", q: "" };
 let sales = JSON.parse(localStorage.getItem('m4t_v3') || '[]');
 // -------------------------------------------------------------
 
@@ -307,7 +307,7 @@ function updCart() {
 async function pay() {
     const total = cart.reduce((a,b)=>a+(b.p*b.q),0), rVal = +el('rec').value || 0, pm = document.querySelector('input[name="pm"]:checked').value, st = el('st').value;
     if(!cart.length || (pm==='ເງິນສົດ' && st==='ຈ່າຍແລ້ວ' && rVal < total)) return msg('ກະລຸນາປ້ອນເງິນຮັບໃຫ້ຄົບ!','bg-red-600');
-    const s = { id: 'INV'+Date.now().toString().slice(-8), items: JSON.stringify(cart), total, pm, st, dd: el('dd').value, cus: el('cus').value || 'ລູກຄ້າທົ່ວໄປ', rec: pm==='ເງິນສົດ' ? rVal : total, chg: (rVal > total ? rVal - total : 0), time: new Date() };
+    const s = { id: 'M4T'+Date.now().toString().slice(-8), items: JSON.stringify(cart), total, pm, st, dd: el('dd').value, cus: el('cus').value || 'ລູກຄ້າທົ່ວໄປ', rec: pm==='ເງິນສົດ' ? rVal : total, chg: (rVal > total ? rVal - total : 0), time: new Date() };
     sales.push(s); localStorage.setItem('m4t_v3', JSON.stringify(sales));
     msg('ກຳລັງສ້າງໃບບິນ...');
     await printProcess(s);
