@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="lo" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <script src="security-core.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#4338ca">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="M4T POS">
+    <link rel="apple-touch-icon" href="https://i.postimg.cc/T3XVwp6Z/1767710343039-2.png">
+    
+    <link rel="manifest" id="pwa-manifest">
+
+    <title>M4T POS - ລະບົບຂາຍສິນຄ້າອາຊີບ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * { font-family: 'Noto Sans Lao', sans-serif; -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { touch-action: manipulation; height: 100dvh; overflow: hidden; }
+        .hide-s::-webkit-scrollbar { display: none; }
+        
+        /* Watermark System สำหรับใบบิน */
+        .receipt-container {
+            width: 380px;
+            background: white;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            color: #000;
+        }
+        .wm-layer {
+            position: absolute;
+            inset: -50%;
+            display: flex;
+            flex-wrap: wrap;
+            transform: rotate(-30deg);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.05;
+            align-content: center;
+            justify-content: center;
+            gap: 40px;
+        }
+        .wm-text { font-size: 14px; font-weight: bold; white-space: nowrap; }
+
+        @media print { .no-p { display: none !important; } }
+        .btn-active:active { transform: scale(0.96); transition: 0.1s; }
+        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .product-card { transition: all 0.2s; border: 1px solid #f1f5f9; }
+        .product-card:active { transform: scale(0.95); }
+        .img-fallback { background: #f8fafc; display: flex; align-items: center; justify-content: center; color: #cbd5e1; }
+    </style>
+</head>
+<body class="bg-slate-50 flex flex-col text-sm select-none">
+
+    <header class="bg-indigo-700 text-white p-3 flex justify-between items-center shadow-lg z-50 no-p">
+        <div class="flex items-center gap-3">
+            <div class="bg-white text-indigo-700 w-10 h-10 flex items-center justify-center rounded-xl shadow-lg font-black text-xl">M</div>
+            <div>
+                <h1 class="font-bold leading-tight text-sm" id="head-title">M4T POS Pro</h1>
+                <div id="bt-status" class="text-[10px] opacity-80 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span> Bluetooth: ປິດຢູ່
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button id="install-btn" class="hidden bg-orange-500 px-3 py-2 rounded-xl text-[10px] font-bold btn-active border border-orange-400 shadow-sm animate-pulse">📲 ຕິດຕັ້ງແອັບ</button>
+            <button onclick="connectBT()" class="bg-indigo-600 px-3 py-2 rounded-xl text-[10px] font-bold btn-active border border-indigo-500 shadow-sm">🔵 Printer</button>
+            <button onclick="askPass()" class="bg-indigo-800 px-3 py-2 rounded-xl text-[10px] font-bold btn-active border border-indigo-500 shadow-sm">⚙️ ຕັ້ງຄ່າ</button>
+        </div>
+    </header>
+
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden no-p">
+        <div class="flex-1 flex flex-col p-3 overflow-hidden">
+            <div class="relative mb-3">
+                <input type="text" id="search" oninput="render()" placeholder="🔍 ຄົ້ນຫາ ຫຼື ສະແກນບາໂຄດ..." 
+                    class="w-full p-4 pl-12 rounded-2xl border-none shadow-sm outline-none focus:ring-2 ring-indigo-500 bg-white text-lg">
+                <span class="absolute left-4 top-4 opacity-30"></span>
+            </div>
+            <div id="cats" class="flex gap-2 mb-3 overflow-x-auto pb-2 hide-s"></div>
+            <div id="prod-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 overflow-y-auto pb-20"></div>
+        </div>
+
+        <div class="w-full md:w-[400px] bg-white shadow-2xl flex flex-col border-l z-40">
+            <div class="p-4 bg-gray-50/50 border-b flex justify-between items-center">
+                <span class="font-bold text-gray-400 uppercase tracking-tighter">ລາຍການທີ່ເລືອກ</span>
+                <button onclick="cart=[];updCart()" class="text-red-400 text-xs font-bold">ລ້າງຕະກ້າ</button>
+            </div>
+            
+            <div id="cart-list" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
+            
+            <div class="p-4 bg-white border-t space-y-3 shadow-[0_-10px_20px_rgba(0,0,0,0.03)]">
+                <div class="grid grid-cols-2 gap-2">
+                    <input id="cus" type="text" placeholder="👤 ຊື່ລູກຄ້າ..." class="border p-3 rounded-xl text-sm outline-none bg-gray-50 focus:bg-white focus:ring-1 ring-indigo-500">
+                    <select id="st" onchange="debtTog()" class="border p-3 rounded-xl text-sm bg-gray-50 font-bold outline-none">
+                        <option value="ຈ່າຍແລ້ວ">✅ ຈ່າຍແລ້ວ</option>
+                        <option value="ຕິດໜີ້">⚠️ ຕິດໜີ້</option>
+                    </select>
+                </div>
+                <input id="dd" type="date" class="hidden w-full border p-3 rounded-xl text-sm bg-yellow-50 outline-none">
+                
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-gray-400 font-bold">ຍອດລວມ</span>
+                    <span id="g-total" class="font-black text-indigo-700 text-3xl tracking-tighter">0 ₭</span>
+                </div>
+
+                <div class="flex gap-2">
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="pm" value="ເງິນສົດ" checked class="peer hidden">
+                        <div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-gray-100 text-gray-500 text-center py-3 rounded-xl text-xs font-bold transition-all border border-transparent">💵 ເງິນສົດ</div>
+                    </label>
+                    <label class="flex-1 cursor-pointer">
+                        <input type="radio" name="pm" value="ໂອນ" onclick="setQR(1)" class="peer hidden">
+                        <div class="peer-checked:bg-indigo-600 peer-checked:text-white bg-gray-100 text-gray-500 text-center py-3 rounded-xl text-xs font-bold transition-all border border-transparent">📱 ໂອນເງິນ</div>
+                    </label>
+                </div>
+
+                <input id="rec" type="number" class="w-full bg-slate-100 p-4 rounded-2xl text-center font-black text-2xl outline-none focus:ring-2 ring-green-500" placeholder="ຮັບເງິນມານີ້...">
+
+                <button id="pay-btn" onclick="pay()" class="w-full bg-green-600 text-white font-black py-5 rounded-2xl shadow-xl btn-active text-xl">ຢືນຢັນການຂາຍ</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="adminM" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[500] p-4">
+        <div class="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="p-6 bg-indigo-700 text-white flex justify-between items-center">
+                <b class="text-xl">⚙️ ຕັ້ງຄ່າລະບົບ</b>
+                <button onclick="closeM('adminM')" class="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full">✕</button>
+            </div>
+            <div class="p-6 grid grid-cols-2 gap-4">
+                <button onclick="openM('prodM')" class="p-5 bg-slate-50 rounded-3xl border border-gray-100 text-center hover:bg-indigo-50 transition-all">
+                    <span class="text-3xl block mb-2">📦</span>
+                    <b class="text-gray-700">ຈັດການສິນຄ້າ</b>
+                </button>
+                <button onclick="showHist()" class="p-5 bg-slate-50 rounded-3xl border border-gray-100 text-center hover:bg-indigo-50 transition-all">
+                    <span class="text-3xl block mb-2">📜</span>
+                    <b class="text-gray-700">ປະຫວັດຂາຍ</b>
+                </button>
+                <button onclick="openM('shopM')" class="p-5 bg-slate-50 rounded-3xl border border-gray-100 text-center hover:bg-indigo-50 transition-all">
+                    <span class="text-3xl block mb-2">🏠</span>
+                    <b class="text-gray-700">ຂໍ້ມູນຮ້ານ</b>
+                </button>
+                <button onclick="exportData()" class="p-5 bg-slate-50 rounded-3xl border border-gray-100 text-center hover:bg-indigo-50 transition-all">
+                    <span class="text-3xl block mb-2">💾</span>
+                    <b class="text-gray-700">Backup</b>
+                </button>
+            </div>
+            <div class="p-6 border-t bg-gray-50 flex flex-col gap-3">
+                <button onclick="importData()" class="w-full py-3 bg-white text-indigo-600 font-bold rounded-2xl shadow-sm border">📥 ນຳເຂົ້າຂໍ້ມູນ (Restore)</button>
+                <button onclick="clearAllData()" class="w-full py-2 text-red-400 text-[10px] font-bold uppercase tracking-widest">ລ້າງຂໍ້ມູນທັງໝົດ</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="prodM" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[510] p-4">
+        <div class="bg-white rounded-[2rem] w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="p-5 border-b flex justify-between items-center"><b class="text-lg">ສາງສິນຄ້າ</b><button onclick="closeM('prodM')" class="text-2xl">✕</button></div>
+            <div class="p-5 bg-indigo-50/50 space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <input id="p-n" type="text" placeholder="ຊື່ສິນຄ້າ" class="p-3 rounded-xl border outline-none">
+                    <input id="p-p" type="number" placeholder="ລາຄາ" class="p-3 rounded-xl border outline-none">
+                    <input id="p-c" type="text" placeholder="ໝວດໝູ່" class="p-3 rounded-xl border outline-none">
+                    <input id="p-i" type="text" placeholder="URL ຮູບສິນຄ້າ" class="p-3 rounded-xl border outline-none">
+                </div>
+                <button onclick="saveProd()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold">➕ ເພີ່ມສິນຄ້າ</button>
+            </div>
+            <div id="p-list" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
+        </div>
+    </div>
+
+    <div id="receipt-capture" class="fixed -left-[2000px] top-0">
+        <div id="rcp-wrap" class="receipt-container">
+            <div class="wm-layer" id="wm-body"></div>
+            <div style="position: relative; z-index: 2;">
+                <center>
+                    <div style="background:#4338ca; color:white; width:50px; height:50px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:900; margin-bottom:10px;">M</div>
+                    <h2 id="rcp-shop" style="font-size:20px; font-weight:bold; margin:0;"></h2>
+                    <p id="rcp-tel" style="font-size:12px; margin:5px 0; opacity:0.8;"></p>
+                    <hr style="border:none; border-top:1px dashed #ccc; margin:15px 0;">
+                    <h3 style="font-size:14px; margin-bottom:10px;">ໃບບິນຮັບເງິນ</h3>
+                </center>
+                <div style="font-size:11px; margin-bottom:15px;">
+                    <div style="display:flex; justify-content:space-between;"><span>ເລກບິນ:</span><b id="rcp-id"></b></div>
+                    <div style="display:flex; justify-content:space-between;"><span>ວັນທີ:</span><b id="rcp-date"></b></div>
+                    <div style="display:flex; justify-content:space-between;"><span>ລູກຄ້າ:</span><b id="rcp-cus"></b></div>
+                </div>
+                <table style="width:100%; font-size:12px; border-collapse: collapse;">
+                    <thead style="border-bottom: 2px solid #000;">
+                        <tr><th align="left" style="padding:5px 0;">ລາຍການ</th><th align="right">ລວມ</th></tr>
+                    </thead>
+                    <tbody id="rcp-items"></tbody>
+                </table>
+                <hr style="border:none; border-top:2px solid #000; margin:10px 0;">
+                <div style="display:flex; justify-content:space-between; font-size:16px; font-weight:bold;"><span>ຍອດລວມ:</span><span id="rcp-total"></span></div>
+                <div style="font-size:11px; margin-top:10px; text-align:right;" id="rcp-details"></div>
+                <center style="margin-top:30px; font-size:10px;"><p>🙏 ຂອບໃຈທີ່ມາອຸດໜູນ 🙏</p></center>
+            </div>
+        </div>
+    </div>
+
+    <div id="shopM" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[510] p-4"><div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl text-center"><h3 class="font-black text-2xl mb-6">ຂໍ້ມູນຮ້ານຄ້າ</h3><div class="space-y-4"><input id="s-n" type="text" placeholder="ຊື່ຮ້ານ" class="w-full p-4 bg-gray-100 rounded-2xl outline-none"><input id="s-t" type="text" placeholder="ເບີໂທ" class="w-full p-4 bg-gray-100 rounded-2xl outline-none"><input id="s-q" type="text" placeholder="URL QR Code" class="w-full p-4 bg-gray-100 rounded-2xl outline-none"><button onclick="saveShop()" class="w-full bg-indigo-700 text-white py-4 rounded-2xl font-bold">ບັນທຶກ</button><button onclick="closeM('shopM')" class="w-full py-2 text-gray-400">ຍົກເລີກ</button></div></div></div>
+    <div id="qrM" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[600] p-8 backdrop-blur-md"><div class="bg-white p-6 rounded-[2.5rem] max-w-xs w-full text-center shadow-2xl"><h3 class="font-bold text-gray-800 mb-5">ສະແກນເພື່ອຊຳລະ</h3><div class="p-2 border-4 border-dashed border-indigo-100 rounded-3xl mb-6"><img id="qr-img" src="" class="w-full rounded-2xl"></div><button onclick="setQR(0)" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black">ໂອນແລ້ວ</button></div></div>
+    <div id="histM" class="hidden fixed inset-0 modal-bg flex items-center justify-center p-4 z-[510]"><div class="bg-white rounded-[2rem] w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"><div class="p-5 border-b bg-indigo-700 text-white flex justify-between items-center"><div><b class="text-xl">📊 ປະຫວັດຂາຍ</b><p id="m-summary" class="text-[10px] mt-1"></p></div><button onclick="closeM('histM')" class="text-2xl">✕</button></div><div id="h-list" class="overflow-y-auto p-4 space-y-3 bg-slate-50 flex-1"></div></div></div>
+    <div id="toast" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-3xl text-white z-[1000] text-sm font-bold shadow-2xl"></div>
+
+<script>
+// --- PWA SETUP START ---
+// สร้าง Manifest File แบบ Dynamic
+const manifest = {
+    "name": "M4T POS Pro - Professional Sale System",
+    "short_name": "M4T POS",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#4338ca",
+    "theme_color": "#4338ca",
+    "icons": [
+        { "src": "https://i.postimg.cc/T3XVwp6Z/1767710343039-2.png", "sizes": "192x192", "type": "image/png" },
+        { "src": "https://i.postimg.cc/T3XVwp6Z/1767710343039-2.png", "sizes": "512x512", "type": "image/png" }
+    ]
+};
+const manifestStr = encodeURIComponent(JSON.stringify(manifest));
+document.getElementById('pwa-manifest').setAttribute('href', `data:application/manifest+json,${manifestStr}`);
+
+// ลงทะเบียน Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('data:application/javascript;base64,' + btoa(`
+            self.addEventListener('install', (e) => self.skipWaiting());
+            self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+        `));
+    });
+}
+
+// ระบบจัดการปุ่มติดตั้ง (Install App)
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    document.getElementById('install-btn').classList.remove('hidden');
+});
+
+document.getElementById('install-btn').addEventListener('click', async () => {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') document.getElementById('install-btn').classList.add('hidden');
+        deferredPrompt = null;
+    }
+});
+// --- PWA SETUP END ---
+
+// --- ORIGINAL POS LOGIC ---
+const PASS = "212004";
+let bleDevice, bleCharacteristic;
+const getStore = (k, d) => JSON.parse(localStorage.getItem(k)) || d;
+const setStore = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+
+let items = getStore('m4t_items', [
+    {id:1, n:"ນ້ຳດື່ມ", p:5000, c:"ເຄື່ອງດື່ມ", img:"https://images.unsplash.com/photo-1548919973-5dea5846f669?w=300"},
+    {id:2, n:"ກາເຟເຢັນ", p:25000, c:"ເຄື່ອງດື່ມ", img:"https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=300"}
+]);
+let shop = getStore('m4t_shop', { n: "M4T POS SHOP", t: "ຮ້ານຄ້າ POS | 020 1234 5678", q: "" });
+let sales = getStore('m4t_v3', []);
+let cart = [], curCat = 'all';
+
+const el = id => document.getElementById(id);
+const openM = id => el(id).classList.remove('hidden');
+const closeM = id => el(id).classList.add('hidden');
+
+async function connectBT() {
+    try {
+        msg("🔌 ກຳລັງຊອກຫາ Printer...", "bg-blue-500");
+        bleDevice = await navigator.bluetooth.requestDevice({
+            acceptAllDevices: true,
+            optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+        });
+        el('bt-status').innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-green-500"></span> Bluetooth: ເຊື່ອມຕໍ່ແລ້ວ`;
+        msg("✅ ເຊື່ອມຕໍ່ແລ້ວ");
+    } catch (e) { msg("❌ ບໍ່ສາມາດເຊື່ອມຕໍ່ໄດ້", "bg-red-500"); }
+}
+
+function render() {
+    const q = el('search').value.toLowerCase();
+    const filtered = items.filter(i => (curCat === 'all' || i.c === curCat) && i.n.toLowerCase().includes(q));
+    el('prod-grid').innerHTML = filtered.map(i => `
+        <div onclick="add(${i.id})" class="product-card bg-white rounded-3xl overflow-hidden cursor-pointer">
+            <div class="h-32 bg-slate-100"><img src="${i.img || ''}" class="w-full h-full object-cover" onerror="this.style.display='none'"></div>
+            <div class="p-3">
+                <h3 class="text-[11px] font-bold text-gray-700 truncate">${i.n}</h3>
+                <p class="text-indigo-600 font-black text-sm mt-1">${i.p.toLocaleString()} ₭</p>
+            </div>
+        </div>`).join('');
+    
+    const cats = ['all', ...new Set(items.map(i => i.c))];
+    el('cats').innerHTML = cats.map(c => `
+        <button onclick="setCat('${c}')" class="${curCat===c ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white text-gray-400'} px-5 py-2 rounded-2xl text-[11px] font-bold border transition-all">
+            ${c === 'all' ? '🛍️ ທັງໝົດ' : c}
+        </button>`).join('');
+    el('head-title').innerText = shop.n;
+}
+
+function setCat(c) { curCat = c; render(); }
+function add(id) { 
+    const x = cart.find(i => i.id === id); 
+    x ? x.q++ : cart.push({...items.find(i => i.id === id), q:1}); 
+    updCart(); 
+}
+function qty(id, d) { 
+    const i = cart.find(x => x.id === id); 
+    if(i) i.q += d; 
+    cart = cart.filter(x => x.q > 0); 
+    updCart(); 
+}
+function updCart() {
+    let t = 0;
+    el('cart-list').innerHTML = cart.length ? cart.map(i => { 
+        t += i.p * i.q; 
+        return `<div class="flex justify-between items-center bg-gray-50 p-3 rounded-2xl border border-gray-100">
+            <div class="flex-1 truncate"><b class="text-gray-800 text-xs">${i.n}</b><div class="text-[10px] text-indigo-500">${i.p.toLocaleString()} ₭</div></div>
+            <div class="flex items-center gap-2 bg-white p-1 rounded-xl border">
+                <button onclick="qty(${i.id},-1)" class="w-7 h-7 text-red-500 font-bold">-</button>
+                <b class="w-5 text-center text-xs">${i.q}</b>
+                <button onclick="qty(${i.id},1)" class="w-7 h-7 text-green-600 font-bold">+</button>
+            </div>
+        </div>` }).join('') : `<div class="h-full flex flex-col items-center justify-center opacity-20"><p>🛒 ຕະກ້າຫວ່າງ</p></div>`;
+    el('g-total').innerText = t.toLocaleString() + ' ₭';
+}
+
+async function printProcess(s) {
+    el('rcp-shop').innerText = shop.n; el('rcp-tel').innerText = shop.t; el('rcp-id').innerText = s.id;
+    el('rcp-date').innerText = new Date(s.time).toLocaleString('lo-LA'); el('rcp-cus').innerText = s.cus;
+    el('rcp-total').innerText = s.total.toLocaleString() + ' ₭';
+    let details = `ຊຳລະ: ${s.pm}`;
+    if(s.pm === 'ເງິນສົດ') details += ` | ຮັບ: ${s.rec.toLocaleString()} | ທອນ: ${s.chg.toLocaleString()}`;
+    el('rcp-details').innerHTML = details;
+    el('rcp-items').innerHTML = JSON.parse(s.items).map(i => `<tr><td style="padding:5px 0;">${i.n} x ${i.q}</td><td align="right">${(i.p*i.q).toLocaleString()}</td></tr>`).join('');
+    el('wm-body').innerHTML = Array(40).fill(`<span class="wm-text">${shop.n}</span>`).join('');
+    setTimeout(async () => {
+        const canvas = await html2canvas(el('rcp-wrap'), { scale: 2 });
+        const link = document.createElement('a');
+        link.download = `Receipt-${s.id}.png`;
+        link.href = canvas.toDataURL();
+        link.click();
+        msg("🧾 ບັນທຶກໃບບິນແລ້ວ");
+    }, 500);
+}
+
+async function pay() {
+    const total = cart.reduce((a,b)=>a+(b.p*b.q),0), rVal = +el('rec').value || 0, pm = document.querySelector('input[name="pm"]:checked').value;
+    if(!cart.length) return msg('⚠️ ເລືອກສິນຄ້າກ່ອນ!','bg-orange-500');
+    const s = { id: 'M4T' + Date.now().toString().slice(-6), items: JSON.stringify(cart), total, pm, st: el('st').value, dd: el('dd').value, cus: el('cus').value || 'ລູກຄ້າທົ່ວໄປ', rec: rVal || total, chg: (rVal > total ? rVal - total : 0), time: new Date() };
+    sales.push(s); setStore('m4t_v3', sales);
+    await printProcess(s);
+    cart = []; updCart(); el('rec').value = el('cus').value = ''; setQR(0);
+}
+
+function askPass() { if(prompt("🔐 ລະຫັດຜ່ານ:") === PASS) openM('adminM'); else msg("❌ ລະຫัดຜິດ!","bg-red-600"); }
+function saveShop() { shop = { n: el('s-n').value, t: el('s-t').value, q: el('s-q').value }; setStore('m4t_shop', shop); msg("✅ ບັນທຶກແລ້ວ"); render(); closeM('shopM'); }
+function saveProd() {
+    items.push({ id: Date.now(), n: el('p-n').value, p: +el('p-p').value, c: el('p-c').value || 'ອື່ນໆ', img: el('p-i').value });
+    setStore('m4t_items', items); render(); updPList(); msg("📦 ເພີ່ມແລ້ວ");
+}
+function updPList() { el('p-list').innerHTML = items.map(i => `<div class="flex justify-between items-center p-3 bg-white rounded-2xl border"><span>${i.n} (${i.p.toLocaleString()} ₭)</span><button onclick="delP(${i.id})" class="text-red-400">✕</button></div>`).join(''); }
+function delP(id) { items = items.filter(i=>i.id!==id); setStore('m4t_items', items); render(); updPList(); }
+function showHist() {
+    openM('histM');
+    el('h-list').innerHTML = sales.sort((a,b)=>new Date(b.time)-new Date(a.time)).map(s => `
+        <div class="bg-white p-4 rounded-2xl border flex justify-between items-center">
+            <div><b class="text-indigo-700">${s.cus}</b><div class="text-[10px] opacity-40">${new Date(s.time).toLocaleString()}</div></div>
+            <div class="text-right"><b>${s.total.toLocaleString()} ₭</b><br><button onclick="reP('${s.id}')" class="text-indigo-600 text-[10px]">ພິມຄືນ</button></div>
+        </div>`).join('');
+}
+function reP(id) { const s = sales.find(x => x.id === id); if(s) printProcess(s); }
+function exportData() { const blob = new Blob([JSON.stringify({ items, shop, sales })], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `M4T-Backup.json`; a.click(); }
+function msg(m, c='bg-green-600') { const t = el('toast'); t.innerText = m; t.className = `fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-3xl text-white z-[1000] text-sm font-bold shadow-2xl ${c}`; t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 3000); }
+function debtTog() { el('dd').classList.toggle('hidden', el('st').value !== 'ຕິດໜີ້'); }
+function setQR(sw) { if(sw && !shop.q) return msg("⚠️ ຍັງບໍ່ມີ QR", "bg-orange-500"); el('qr-img').src=shop.q; el('qrM').classList.toggle('hidden', !sw); }
+
+window.onload = () => { render(); updPList(); el('s-n').value = shop.n; el('s-t').value = shop.t; el('s-q').value = shop.q; };
+</script>
+</body>
+</html>
