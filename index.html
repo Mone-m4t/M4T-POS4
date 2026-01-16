@@ -8,377 +8,581 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="M4T POS">
     <link rel="apple-touch-icon" href="https://i.postimg.cc/T3XVwp6Z/1767710343039-2.png">
-    <title>M4T POS - ລະບົບຂາຍສິນຄ້າ</title>
+    <title>M4T POS - ລະບົບຂາຍສິນຄ້າອາຊີບ</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        * { font-family: 'Noto Sans Lao', sans-serif; -webkit-tap-highlight-color: transparent; }
+        * { font-family: 'Noto Sans Lao', sans-serif; -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { touch-action: manipulation; }
         .hide-s::-webkit-scrollbar { display: none; }
-        /* Watermark Style */
-        .wm-overlay { position: absolute; inset: 0; display: flex; flex-wrap: wrap; justify-content: center; align-content: center; transform: rotate(-30 deg); pointer-events: none; z-index: 5; overflow: hidden; }
-        .wm-text { font-size: 10px; color: rgba(0,0,0,0.05); font-weight: bold; padding: 10px; white-space: nowrap; }
         
-        @media print { .no-p { display: none !important; } #receipt-print-area { display: block !important; position: absolute; top:0; left:0; width:100%; } }
-        .btn-active:active { transform: scale(0.96); transition: 0.1s; }
-        .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
-        #bt-status.connected { color: #10b981; }
+        /* Advanced Watermark System */
+        .wm-container {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(8, 1fr);
+            gap: 10px;
+            pointer-events: none;
+            z-index: 1;
+            opacity: 0.04;
+            transform: rotate(-25deg) scale(1.2);
+            overflow: hidden;
+        }
+        .wm-item {
+            font-size: 10px;
+            font-weight: bold;
+            white-space: nowrap;
+            color: #000;
+        }
+
+        @media print { .no-p { display: none !important; } }
+        .btn-active:active { transform: scale(0.95); transition: 0.1s; }
+        .modal-bg { background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); transition: 0.3s; }
+        #bt-status.connected { color: #10b981; font-weight: bold; }
+        .product-card { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .product-card:active { transform: scale(0.92); opacity: 0.8; }
     </style>
 </head>
-<body class="bg-gray-100 h-full flex flex-col overflow-hidden text-sm select-none">
+<body class="bg-slate-100 h-full flex flex-col overflow-hidden text-sm select-none">
 
-    <header class="bg-indigo-700 text-white p-3 flex justify-between items-center shadow-lg no-p">
-        <div class="flex items-center gap-2">
-            <div class="bg-white text-indigo-700 p-1 rounded-lg font-bold">M4T</div>
+    <header class="bg-indigo-700 text-white p-3 flex justify-between items-center shadow-md z-50 no-p">
+        <div class="flex items-center gap-3">
+            <div class="bg-white text-indigo-700 p-1.5 rounded-xl shadow-inner font-black text-lg">M4T</div>
             <div>
-                <h1 class="font-bold leading-tight text-xs" id="head-title">M4T POS Pro</h1>
-                <div id="bt-status" class="text-[9px] opacity-70">🔴 Bluetooth: ບໍ່ໄດ້ເຊື່ອມຕໍ່</div>
+                <h1 class="font-bold leading-tight text-sm truncate max-w-[120px]" id="head-title">M4T POS Pro</h1>
+                <div id="bt-status" class="text-[10px] opacity-80 flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Bluetooth: ບໍ່ໄດ້ເຊື່ອມຕໍ່
+                </div>
             </div>
         </div>
-        <div class="flex gap-2">
-            <button onclick="connectBT()" class="bg-blue-600 px-3 py-2 rounded-xl text-[10px] font-bold btn-active border border-blue-400">🔵 ເຊື່ອມຕໍ່ປຣິນເຕີ</button>
-            <button onclick="askPass()" class="bg-indigo-600 px-3 py-2 rounded-xl text-[10px] font-bold btn-active border border-indigo-500">⚙️ ຈັດການ</button>
+        <div class="flex gap-1.5">
+            <button onclick="connectBT()" class="bg-blue-600 hover:bg-blue-500 px-3 py-2 rounded-xl text-[10px] font-bold btn-active border border-blue-400 shadow-sm">🔵 Printer</button>
+            <button onclick="askPass()" class="bg-indigo-800 hover:bg-indigo-600 px-3 py-2 rounded-xl text-[10px] font-bold btn-active border border-indigo-500 shadow-sm">⚙️ ຕັ້ງຄ່າ</button>
         </div>
     </header>
 
     <main class="flex-1 flex flex-col md:flex-row overflow-hidden no-p">
         <div class="flex-1 flex flex-col p-3 overflow-hidden">
-            <div class="flex gap-2 mb-3">
-                <input type="text" id="search" oninput="render()" placeholder="🔍 ຄົ້ນຫາສິນຄ້າ..." class="flex-1 p-2 rounded-xl border-none shadow-sm outline-none focus:ring-2 ring-indigo-500">
+            <div class="relative mb-3">
+                <input type="text" id="search" oninput="render()" placeholder="🔍 ຄົ້ນຫາສິນຄ້າ ຫຼື ສະແກນບາໂຄດ..." 
+                    class="w-full p-3.5 pl-10 rounded-2xl border-none shadow-md outline-none focus:ring-2 ring-indigo-500 bg-white">
             </div>
-            <div id="cats" class="flex gap-2 mb-3 overflow-x-auto pb-1 hide-s"></div>
-            <div id="prod-grid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 overflow-y-auto pr-1"></div>
+            <div id="cats" class="flex gap-2 mb-3 overflow-x-auto pb-2 hide-s"></div>
+            <div id="prod-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 overflow-y-auto pr-1 pb-20"></div>
         </div>
 
-        <div class="w-full md:w-80 bg-white shadow-2xl flex flex-col border-l">
-            <div class="p-3 bg-gray-50 border-b flex justify-between items-center font-bold text-xs uppercase text-gray-400">
-                <span>ຕະກ້າສິນຄ້າ</span><span id="c-count" class="bg-indigo-700 text-white px-2 rounded-full">0</span>
+        <div class="w-full md:w-96 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.1)] flex flex-col border-l z-40">
+            <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
+                <span class="font-black text-gray-500 uppercase tracking-widest text-[10px]">ລາຍການທີ່ເລືອກ</span>
+                <span id="c-count" class="bg-indigo-600 text-white px-3 py-0.5 rounded-full text-xs font-bold shadow-lg">0</span>
             </div>
-            <div id="cart-list" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+            <div id="cart-list" class="flex-1 overflow-y-auto p-4 space-y-3 bg-white"></div>
             
-            <div class="p-3 bg-white border-t space-y-2.5 shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+            <div class="p-4 bg-white border-t border-gray-100 space-y-3 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
                 <div class="grid grid-cols-2 gap-2">
-                    <input id="cus" type="text" placeholder="ຊື່ລູກຄ້າ..." class="border p-2 rounded-lg text-xs outline-none focus:border-indigo-500">
-                    <select id="st" onchange="debtTog()" class="border p-2 rounded-lg text-xs bg-gray-50 outline-none">
+                    <input id="cus" type="text" placeholder="👤 ຊື່ລູກຄ້າ..." class="border p-2.5 rounded-xl text-xs outline-none focus:ring-2 ring-indigo-200">
+                    <select id="st" onchange="debtTog()" class="border p-2.5 rounded-xl text-xs bg-gray-50 font-bold outline-none">
                         <option value="ຈ່າຍແລ້ວ">✅ ຈ່າຍແລ້ວ</option>
                         <option value="ຕິດໜີ້">⚠️ ຕິດໜີ້</option>
                     </select>
                 </div>
-                <input id="dd" type="date" class="hidden w-full border p-2 rounded-lg text-xs bg-yellow-50 outline-none">
-                <div class="flex justify-between font-bold text-indigo-700 text-lg border-t pt-2"><span>ລວມທັງໝົດ</span><span id="g-total">0 ₭</span></div>
-                <div class="flex gap-1">
-                    <label class="flex-1 cursor-pointer"><input type="radio" name="pm" value="ເງິນສົດ" checked class="peer hidden"><div class="peer-checked:bg-indigo-600 peer-checked:text-white border text-center py-2 rounded-lg text-[10px] font-bold">ເງິນສົດ</div></label>
-                    <label class="flex-1 cursor-pointer"><input type="radio" name="pm" value="ໂອນ" onclick="setQR(1)" class="peer hidden"><div class="peer-checked:bg-indigo-600 peer-checked:text-white border text-center py-2 rounded-lg text-[10px] font-bold">ໂອນເງິນ</div></label>
+                <input id="dd" type="date" class="hidden w-full border p-2.5 rounded-xl text-xs bg-yellow-50 outline-none">
+                
+                <div class="flex justify-between items-end border-t pt-3">
+                    <span class="text-gray-400 font-bold text-xs uppercase">ຍອດລວມທັງໝົດ</span>
+                    <span id="g-total" class="font-black text-indigo-700 text-2xl tracking-tighter">0 ₭</span>
                 </div>
-                <input id="rec" type="number" class="w-full border-2 border-gray-100 p-2.5 rounded-xl text-center font-bold text-lg outline-none" placeholder="ຮັບເງິນມາ...">
-                <button id="pay-btn" onclick="pay()" class="w-full bg-green-600 text-white font-bold py-4 rounded-xl shadow-lg btn-active uppercase tracking-wider">ຢືນຢັນການຂາຍ</button>
+
+                <div class="flex gap-2">
+                    <label class="flex-1 cursor-pointer group">
+                        <input type="radio" name="pm" value="ເງິນສົດ" checked class="peer hidden">
+                        <div class="peer-checked:bg-indigo-600 peer-checked:text-white border-2 border-transparent bg-gray-100 text-gray-600 text-center py-2.5 rounded-xl text-xs font-bold transition-all group-active:scale-95">💵 ເງິນສົດ</div>
+                    </label>
+                    <label class="flex-1 cursor-pointer group">
+                        <input type="radio" name="pm" value="ໂອນ" onclick="setQR(1)" class="peer hidden">
+                        <div class="peer-checked:bg-indigo-600 peer-checked:text-white border-2 border-transparent bg-gray-100 text-gray-600 text-center py-2.5 rounded-xl text-xs font-bold transition-all group-active:scale-95">📱 ໂອນເງິນ</div>
+                    </label>
+                </div>
+
+                <div class="relative">
+                    <input id="rec" type="number" class="w-full bg-gray-50 border-2 border-gray-100 p-3.5 rounded-2xl text-center font-black text-xl outline-none focus:border-green-500 focus:bg-white transition-all" placeholder="ຮັບເງິນມານີ້...">
+                </div>
+
+                <button id="pay-btn" onclick="pay()" class="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl shadow-xl btn-active uppercase tracking-widest text-lg">ຢືນຢັນການຂາຍ</button>
             </div>
         </div>
     </main>
 
     <div id="adminM" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[500] p-4">
-        <div class="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div class="p-4 bg-indigo-700 text-white flex justify-between items-center">
-                <b class="text-lg">⚙️ ຕັ້ງຄ່າ ແລະ ຈັດການ</b>
-                <button onclick="closeM('adminM')" class="text-2xl">✕</button>
+        <div class="bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl">
+            <div class="p-6 bg-indigo-700 text-white flex justify-between items-center">
+                <b class="text-xl">⚙️ ຕັ້ງຄ່າລະບົບ</b>
+                <button onclick="closeM('adminM')" class="w-10 h-10 flex items-center justify-center bg-white/20 rounded-full text-xl">✕</button>
             </div>
-            <div class="p-4 grid grid-cols-2 gap-3">
-                <button onclick="openM('prodM')" class="p-4 bg-gray-50 rounded-2xl border hover:bg-indigo-50 text-center">📦<br>ສິນຄ້າ</button>
-                <button onclick="showHist()" class="p-4 bg-gray-50 rounded-2xl border hover:bg-indigo-50 text-center">📜<br>ປະຫວັດ</button>
-                <button onclick="openM('shopM')" class="p-4 bg-gray-50 rounded-2xl border hover:bg-indigo-50 text-center">🏠<br>ຮ້ານຄ້າ</button>
-                <button onclick="exportData()" class="p-4 bg-gray-50 rounded-2xl border hover:bg-indigo-50 text-center">💾<br>ສຳຮອງ</button>
+            <div class="p-6 grid grid-cols-2 gap-4">
+                <button onclick="openM('prodM')" class="p-6 bg-slate-50 rounded-3xl border-2 border-transparent hover:border-indigo-500 transition-all text-center group">
+                    <span class="text-3xl block mb-2 group-hover:scale-110 transition-transform">📦</span>
+                    <b class="text-gray-700">ຈັດການສິນຄ້າ</b>
+                </button>
+                <button onclick="showHist()" class="p-6 bg-slate-50 rounded-3xl border-2 border-transparent hover:border-indigo-500 transition-all text-center group">
+                    <span class="text-3xl block mb-2 group-hover:scale-110 transition-transform">📜</span>
+                    <b class="text-gray-700">ປະຫວັດຂາຍ</b>
+                </button>
+                <button onclick="openM('shopM')" class="p-6 bg-slate-50 rounded-3xl border-2 border-transparent hover:border-indigo-500 transition-all text-center group">
+                    <span class="text-3xl block mb-2 group-hover:scale-110 transition-transform">🏠</span>
+                    <b class="text-gray-700">ຂໍ້ມູນຮ້ານ</b>
+                </button>
+                <button onclick="exportData()" class="p-6 bg-slate-50 rounded-3xl border-2 border-transparent hover:border-indigo-500 transition-all text-center group">
+                    <span class="text-3xl block mb-2 group-hover:scale-110 transition-transform">💾</span>
+                    <b class="text-gray-700">Backup</b>
+                </button>
             </div>
-            <div class="p-4 border-t flex flex-col gap-2">
-                <button onclick="importData()" class="w-full py-2 text-indigo-600 font-bold">📥 ນຳເຂົ້າຂໍ້ມູນ (Restore)</button>
-                <button onclick="clearAllData()" class="w-full py-2 text-red-400 text-xs">ລ້າງຂໍ້ມູນທັງໝົດ</button>
+            <div class="p-6 border-t bg-gray-50 flex flex-col gap-3">
+                <button onclick="importData()" class="w-full py-3 bg-white text-indigo-600 font-bold rounded-2xl shadow-sm">📥 Restore (ນຳເຂົ້າຂໍ້ມູນ)</button>
+                <button onclick="clearAllData()" class="w-full py-2 text-red-400 text-[10px] font-bold uppercase tracking-widest">Format Data (ລ້າງຂໍ້ມູນທັງໝົດ)</button>
             </div>
         </div>
     </div>
 
     <div id="prodM" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[510] p-4">
-        <div class="bg-white rounded-3xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
-            <div class="p-4 border-b flex justify-between items-center">
-                <b class="text-lg">ຈັດການລາຍການສິນຄ້າ</b>
+        <div class="bg-white rounded-[2rem] w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="p-5 border-b flex justify-between items-center bg-white sticky top-0">
+                <b class="text-lg">ສາງສິນຄ້າ</b>
                 <button onclick="closeM('prodM')" class="text-2xl">✕</button>
             </div>
-            <div class="p-4 bg-gray-50 space-y-2">
-                <div class="grid grid-cols-2 gap-2">
-                    <input id="p-n" type="text" placeholder="ຊື່ສິນຄ້າ" class="p-2 border rounded-lg outline-none">
-                    <input id="p-p" type="number" placeholder="ລາຄາ" class="p-2 border rounded-lg outline-none">
-                    <input id="p-c" type="text" placeholder="ໝວດໝູ່" class="p-2 border rounded-lg outline-none">
-                    <input id="p-i" type="text" placeholder="Link ຮູບ" class="p-2 border rounded-lg outline-none">
+            <div class="p-5 bg-indigo-50 space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <input id="p-n" type="text" placeholder="ຊື່ສິນຄ້າ" class="p-3 rounded-xl border-none shadow-sm outline-none">
+                    <input id="p-p" type="number" placeholder="ລາຄາ" class="p-3 rounded-xl border-none shadow-sm outline-none">
+                    <input id="p-c" type="text" placeholder="ໝວດໝູ່" class="p-3 rounded-xl border-none shadow-sm outline-none">
+                    <input id="p-i" type="text" placeholder="Link ຮູບ (ຖ້າມີ)" class="p-3 rounded-xl border-none shadow-sm outline-none">
                 </div>
-                <button onclick="saveProd()" class="w-full bg-indigo-600 text-white py-2 rounded-xl font-bold">➕ ເພີ່ມສິນຄ້າ</button>
+                <button onclick="saveProd()" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all">➕ ເພີ່ມລາຍການໃໝ່</button>
             </div>
-            <div id="p-list" class="flex-1 overflow-y-auto p-4 space-y-2"></div>
+            <div id="p-list" class="flex-1 overflow-y-auto p-5 space-y-3"></div>
         </div>
     </div>
 
     <div id="shopM" class="hidden fixed inset-0 modal-bg flex items-center justify-center z-[510] p-4">
-        <div class="bg-white rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-            <h3 class="font-bold text-xl mb-4">ຂໍ້ມູນຮ້ານຄ້າ</h3>
-            <div class="space-y-3">
-                <input id="s-n" type="text" placeholder="ຊື່ຮ້ານ" class="w-full p-3 border rounded-xl outline-none">
-                <input id="s-t" type="text" placeholder="ທີ່ຢູ່/ເບີໂທ" class="w-full p-3 border rounded-xl outline-none">
-                <input id="s-q" type="text" placeholder="Link QR Code" class="w-full p-3 border rounded-xl outline-none">
-                <button onclick="saveShop()" class="w-full bg-indigo-700 text-white py-3 rounded-xl font-bold btn-active">ບັນທຶກ</button>
-                <button onclick="closeM('shopM')" class="w-full py-2 text-gray-400 text-center">ຍົກເລີກ</button>
+        <div class="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl">
+            <h3 class="font-black text-2xl mb-6 text-center">ຂໍ້ມູນຮ້ານຄ້າ</h3>
+            <div class="space-y-4">
+                <input id="s-n" type="text" placeholder="ຊື່ຮ້ານ" class="w-full p-4 bg-gray-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500">
+                <input id="s-t" type="text" placeholder="ເບີໂທ / ທີ່ຢູ່" class="w-full p-4 bg-gray-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500">
+                <input id="s-q" type="text" placeholder="Link QR ຮັບເງິນ (URL)" class="w-full p-4 bg-gray-100 rounded-2xl outline-none focus:ring-2 ring-indigo-500">
+                <button onclick="saveShop()" class="w-full bg-indigo-700 text-white py-4 rounded-2xl font-bold btn-active shadow-xl">ບັນທຶກຂໍ້ມູນ</button>
+                <button onclick="closeM('shopM')" class="w-full py-2 text-gray-400 font-bold">ຍົກເລີກ</button>
             </div>
         </div>
     </div>
 
-    <div id="qrM" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-[600] p-6 backdrop-blur-sm">
-        <div class="bg-white p-5 rounded-3xl max-w-xs w-full text-center">
-            <h3 class="font-bold mb-4">ສະແກນເພື່ອໂອນ</h3>
-            <img id="qr-img" src="" class="w-full rounded-2xl mb-5 border-4 border-gray-50">
-            <button onclick="setQR(0)" class="w-full bg-indigo-600 text-white py-3 rounded-2xl font-bold">ປິດ</button>
+    <div id="qrM" class="hidden fixed inset-0 bg-black/90 flex items-center justify-center z-[600] p-8 backdrop-blur-md">
+        <div class="bg-white p-6 rounded-[2.5rem] max-w-xs w-full text-center shadow-2xl">
+            <h3 class="font-bold text-gray-800 mb-5">ສະແກນຜ່ານແອັບທະນາຄານ</h3>
+            <div class="p-2 border-4 border-dashed border-indigo-100 rounded-3xl mb-6">
+                <img id="qr-img" src="" class="w-full rounded-2xl shadow-sm">
+            </div>
+            <button onclick="setQR(0)" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-black shadow-lg">ຂ້ອຍໂອນແລ້ວ</button>
         </div>
     </div>
 
     <div id="histM" class="hidden fixed inset-0 modal-bg flex items-center justify-center p-4 z-[510]">
-        <div class="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
-            <div class="p-4 border-b bg-indigo-700 text-white flex justify-between items-center">
-                <div><b class="text-lg">ປະຫວັດການຂາຍ</b><p id="m-summary" class="text-[10px] opacity-80"></p></div>
+        <div class="bg-white rounded-[2rem] w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="p-5 border-b bg-indigo-700 text-white flex justify-between items-center">
+                <div>
+                    <b class="text-xl">📊 ປະຫວັດການຂາຍ</b>
+                    <p id="m-summary" class="text-[10px] bg-white/20 rounded-full px-2 py-0.5 mt-1"></p>
+                </div>
                 <button onclick="closeM('histM')" class="text-2xl">✕</button>
             </div>
-            <div id="h-list" class="overflow-y-auto p-4 space-y-3 bg-gray-100 flex-1"></div>
+            <div id="h-list" class="overflow-y-auto p-4 space-y-3 bg-slate-50 flex-1"></div>
         </div>
     </div>
 
-    <div id="receipt-print-area" class="fixed -left-[1000px] top-0"></div>
-    <div id="toast" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full text-white z-[1000] text-xs font-bold shadow-2xl animate-bounce"></div>
+    <div id="receipt-print-area" class="fixed -left-[2000px] top-0"></div>
+    <div id="toast" class="hidden fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-3xl text-white z-[1000] text-sm font-bold shadow-2xl transition-all"></div>
 
 <script>
+/* * M4T POS CORE ENGINE v3.1 
+ * Security-First & Performance Optimized
+ */
 const PASS = "212004";
 let bleDevice, bleCharacteristic;
 
-let items = JSON.parse(localStorage.getItem('m4t_items')) || [
-    {id:1, n:"ນ້ຳດື່ມ", p:5000, c:"ເຄື່ອງດື່ມ", img:"https://images.unsplash.com/photo-1548919973-5dea5846f669?w=150"},
-    {id:2, n:"ກາເຟ", p:25000, c:"ເຄື່ອງດື່ມ", img:"https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=150"}
-];
-let shop = JSON.parse(localStorage.getItem('m4t_shop')) || { n: "M4T POS SHOP", t: "ຮ້ານຄ້າ POS | 020 1234 5678", q: "" };
-let cart = [], sales = JSON.parse(localStorage.getItem('m4t_v3') || '[]'), curCat = 'all';
+// Persistence Engine
+const getStore = (key, def) => JSON.parse(localStorage.getItem(key)) || def;
+const setStore = (key, val) => localStorage.setItem(key, JSON.stringify(val));
+
+let items = getStore('m4t_items', [
+    {id:1, n:"ນ້ຳດື່ມບໍລິສຸດ", p:5000, c:"ເຄື່ອງດື່ມ", img:"https://images.unsplash.com/photo-1548919973-5dea5846f669?w=300"},
+    {id:2, n:"ກາເຟເຢັນ", p:25000, c:"ເຄື່ອງດື່ມ", img:"https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=300"}
+]);
+let shop = getStore('m4t_shop', { n: "M4T POS SHOP", t: "ຮ້ານຄ້າ POS | 020 1234 5678", q: "" });
+let sales = getStore('m4t_v3', []);
+let cart = [], curCat = 'all';
 
 const el = id => document.getElementById(id);
-const openM = id => el(id).classList.remove('hidden');
+const openM = id => { const m = el(id); m.classList.remove('hidden'); m.classList.add('animate-in', 'fade-in', 'zoom-in'); };
 const closeM = id => el(id).classList.add('hidden');
 
+// Bluetooth Logic
 async function connectBT() {
     try {
-        msg("ກຳລັງຄົ້ນຫາ...", "bg-blue-500");
+        msg("🔌 ກຳລັງຄົ້ນຫາ Bluetooth...", "bg-blue-500");
         bleDevice = await navigator.bluetooth.requestDevice({
-            filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }, { namePrefix: 'MTP' }, { namePrefix: 'RPP' }, { namePrefix: 'Bluetooth' }],
+            acceptAllDevices: false,
+            filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }, { namePrefix: 'MTP' }, { namePrefix: 'RPP' }],
             optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
         });
         const server = await bleDevice.gatt.connect();
         const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-        const characteristics = await service.getCharacteristics();
-        bleCharacteristic = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
-        el('bt-status').innerText = "🟢 Bluetooth: ເຊື່ອມຕໍ່ແລ້ວ";
+        const chars = await service.getCharacteristics();
+        bleCharacteristic = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+        el('bt-status').innerHTML = `<span class="w-2 h-2 rounded-full bg-green-500"></span> Bluetooth: ເຊື່ອມຕໍ່ແລ້ວ`;
         el('bt-status').classList.add('connected');
-        msg("ເຊື່ອມຕໍ່ສຳເລັດ!");
-    } catch (e) { msg("ການເຊື່ອມຕໍ່ຫຼົ້ມເຫຼວ", "bg-red-500"); }
-}
-
-async function sendToPrinter(blob) {
-    if (!bleCharacteristic) return;
-    const arrayBuffer = await blob.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    const chunkSize = 100;
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        await bleCharacteristic.writeValue(uint8Array.slice(i, i + chunkSize));
+        msg("✅ ເຊື່ອມຕໍ່ປຣິນເຕີສຳເລັດ!");
+    } catch (e) { 
+        console.error(e);
+        msg("❌ ບໍ່ສາມາດເຊື່ອມຕໍ່ໄດ້", "bg-red-500"); 
     }
 }
 
+// Rendering Engine (Optimized)
 function render() {
     const q = el('search').value.toLowerCase();
     const filtered = items.filter(i => (curCat === 'all' || i.c === curCat) && i.n.toLowerCase().includes(q));
+    
     el('prod-grid').innerHTML = filtered.map(i => `
-        <div onclick="add(${i.id})" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden active:scale-95 transition-all cursor-pointer">
-            <img src="${i.img || 'https://via.placeholder.com/150'}" class="w-full h-24 object-cover">
-            <div class="p-2 text-center">
-                <h3 class="text-[11px] font-bold truncate">${i.n}</h3>
-                <p class="text-indigo-600 font-bold text-xs">${i.p.toLocaleString()} ₭</p>
+        <div onclick="add(${i.id})" class="product-card bg-white rounded-[1.5rem] shadow-sm border border-gray-100 overflow-hidden cursor-pointer relative">
+            <div class="h-28 overflow-hidden bg-gray-50">
+                <img src="${i.img || 'https://via.placeholder.com/150'}" class="w-full h-full object-cover">
+            </div>
+            <div class="p-3">
+                <h3 class="text-[11px] font-bold text-gray-800 truncate">${i.n}</h3>
+                <p class="text-indigo-600 font-black text-[13px] mt-1">${i.p.toLocaleString()} ₭</p>
             </div>
         </div>`).join('');
     
     const cats = ['all', ...new Set(items.map(i => i.c))];
     el('cats').innerHTML = cats.map(c => `
-        <button onclick="setCat('${c}')" class="${curCat===c ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'} px-5 py-1.5 rounded-full text-xs border shadow-sm whitespace-nowrap">${c === 'all' ? 'ທັງໝົດ' : c}</button>
+        <button onclick="setCat('${c}')" class="${curCat===c ? 'bg-indigo-600 text-white shadow-indigo-200' : 'bg-white text-gray-500'} px-5 py-2 rounded-2xl text-[11px] font-bold border shadow-sm whitespace-nowrap transition-all">
+            ${c === 'all' ? '🛍️ ທັງໝົດ' : c}
+        </button>
     `).join('');
     el('qr-img').src = shop.q;
-    el('head-title').innerHTML = `${shop.n}<br><span class="text-[9px] opacity-70">ລະບົບພ້ອມໃຊ້ງານ</span>`;
+    el('head-title').innerHTML = `${shop.n}<br><span class="text-[9px] font-normal opacity-70">ລະບົບຂາຍອັດສະລິຍະ</span>`;
 }
 
 function setCat(c) { curCat = c; render(); }
-function add(id) { const x = cart.find(i => i.id === id); x ? x.q++ : cart.push({...items.find(i => i.id === id), q:1}); updCart(); }
-function qty(id, d) { const i = cart.find(x => x.id === id); if(i) i.q += d; cart = cart.filter(x => x.q > 0); updCart(); }
+function add(id) { 
+    const x = cart.find(i => i.id === id); 
+    x ? x.q++ : cart.push({...items.find(i => i.id === id), q:1}); 
+    updCart(); 
+}
+function qty(id, d) { 
+    const i = cart.find(x => x.id === id); 
+    if(i) i.q += d; 
+    cart = cart.filter(x => x.q > 0); 
+    updCart(); 
+}
 
 function updCart() {
     let t = 0;
-    el('cart-list').innerHTML = cart.map(i => { t += i.p * i.q; return `
-        <div class="flex justify-between items-center bg-gray-50 p-2.5 rounded-xl border border-gray-100 text-xs">
-            <div class="flex-1 truncate"><b>${i.n}</b><br><span class="opacity-50">${i.p.toLocaleString()} x ${i.q}</span></div>
-            <div class="flex items-center gap-2">
-                <button onclick="qty(${i.id},-1)" class="w-7 h-7 bg-white border rounded-lg shadow-sm">-</button>
-                <b class="w-5 text-center">${i.q}</b>
-                <button onclick="qty(${i.id},1)" class="w-7 h-7 bg-white border rounded-lg shadow-sm">+</button>
-            </div></div>` }).join('');
+    el('cart-list').innerHTML = cart.length ? cart.map(i => { 
+        t += i.p * i.q; 
+        return `
+        <div class="flex justify-between items-center bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100 text-xs animate-in slide-in-from-right-2">
+            <div class="flex-1 truncate pr-2">
+                <b class="text-gray-800">${i.n}</b>
+                <div class="text-[10px] text-indigo-500 font-bold">${i.p.toLocaleString()} ₭</div>
+            </div>
+            <div class="flex items-center gap-3 bg-white p-1 rounded-xl shadow-sm border">
+                <button onclick="qty(${i.id},-1)" class="w-7 h-7 flex items-center justify-center text-red-500 font-bold">-</button>
+                <b class="w-4 text-center text-sm">${i.q}</b>
+                <button onclick="qty(${i.id},1)" class="w-7 h-7 flex items-center justify-center text-green-600 font-bold">+</button>
+            </div>
+        </div>` }).join('') : `<div class="h-full flex flex-col items-center justify-center opacity-20"><span class="text-5xl">🛒</span><p>ບໍ່ມີສິນຄ້າໃນຕະກ້າ</p></div>`;
     el('c-count').innerText = cart.length;
     el('g-total').innerText = t.toLocaleString() + ' ₭';
 }
 
 async function pay() {
     const total = cart.reduce((a,b)=>a+(b.p*b.q),0), rVal = +el('rec').value || 0, pm = document.querySelector('input[name="pm"]:checked').value, st = el('st').value;
-    if(!cart.length || (pm==='ເງິນສົດ' && st==='ຈ່າຍແລ້ວ' && rVal < total)) return msg('ກະລຸນາປ້ອນເງິນຮັບໃຫ້ຄົບ!','bg-red-600');
     
-    const s = { id: 'M4T-'+Date.now().toString().slice(-8), items: JSON.stringify(cart), total, pm, st, dd: el('dd').value, cus: el('cus').value || 'ລູກຄ້າທົ່ວໄປ', rec: pm==='ເງິນສົດ' ? rVal : total, chg: (rVal > total ? rVal - total : 0), time: new Date() };
-    sales.push(s); localStorage.setItem('m4t_v3', JSON.stringify(sales));
+    if(!cart.length) return msg('⚠️ ກະລຸນາເລືອກສິນຄ້າກ່ອນ!','bg-orange-500');
+    if(pm==='ເງິນສົດ' && st==='ຈ່າຍແລ້ວ' && rVal < total) return msg('❌ ຮັບເງິນບໍ່ຄົບຕາມຍອດ!','bg-red-600');
     
-    msg('ກຳລັງສ້າງໃບບິນ...');
+    const s = { 
+        id: 'M4T' + Math.random().toString(36).substr(2, 6).toUpperCase(), 
+        items: JSON.stringify(cart), total, pm, st, 
+        dd: el('dd').value, cus: el('cus').value || 'ລູກຄ້າທົ່ວໄປ', 
+        rec: pm==='ເງິນສົດ' ? rVal : total, 
+        chg: (rVal > total ? rVal - total : 0), 
+        time: new Date() 
+    };
+    
+    sales.push(s); 
+    setStore('m4t_v3', sales);
+    
+    msg('🧾 ກຳລັງສ້າງໃບບິນ...');
     await printProcess(s);
     
     cart = []; updCart(); 
     el('rec').value = el('cus').value = el('dd').value = ''; 
+    setQR(0);
 }
 
 async function printProcess(s) {
     const its = JSON.parse(s.items);
-    // Watermark generation
-    let wms = ''; for(let i=0; i<12; i++) wms += `<div class="wm-text">${s.id}</div>`;
-    
     const printEl = el('receipt-print-area');
+    
+    // Generate Dense Watermark Grid
+    let wmContent = '';
+    for(let i=0; i<32; i++) wmContent += `<div class="wm-item">${s.id}</div>`;
+
     printEl.innerHTML = `
-        <div id="r-cap" class="relative p-6 w-[350px] bg-white text-black border shadow-lg overflow-hidden">
-            <div class="wm-overlay">${wms}</div>
+        <div id="r-cap" class="relative p-8 w-[380px] bg-white text-black border shadow-lg overflow-hidden">
+            <div class="wm-container">${wmContent}</div>
+            
             <div class="relative z-10 text-center">
-                <h2 class="font-bold text-xl leading-tight uppercase text-indigo-800">${shop.n}</h2>
-                <p class="text-[10px] text-gray-500 mb-2">${shop.t}</p>
-                <div class="border-t-2 border-dashed border-gray-200 my-3"></div>
-                <div class="text-left text-[10px] space-y-1">
-                    <div class="flex justify-between"><span>ເລກບິນ:</span><span class="font-bold">${s.id}</span></div>
+                <div class="w-16 h-16 bg-indigo-700 text-white rounded-2xl flex items-center justify-center text-2xl font-black mx-auto mb-3 shadow-lg">M4T</div>
+                <h2 class="font-black text-2xl leading-none uppercase text-gray-900">${shop.n}</h2>
+                <p class="text-[11px] text-gray-500 mt-2 font-bold">${shop.t}</p>
+                
+                <div class="border-t-2 border-dashed border-gray-200 my-4"></div>
+                
+                <div class="text-left text-[11px] space-y-1 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                    <div class="flex justify-between"><span>ເລກບິນ (ID):</span><span class="font-black text-indigo-700">#${s.id}</span></div>
                     <div class="flex justify-between"><span>ວັນທີ:</span><span>${new Date(s.time).toLocaleString('lo-LA')}</span></div>
-                    <div class="flex justify-between"><span>ລູກຄ້າ:</span><span>${s.cus}</span></div>
-                    <div class="flex justify-between"><span>ສະຖານະ:</span><span class="font-bold underline">${s.st}</span></div>
+                    <div class="flex justify-between"><span>ລູກຄ້າ:</span><span class="font-bold">${s.cus}</span></div>
+                    <div class="flex justify-between"><span>ສະຖານະ:</span><span class="px-2 bg-indigo-100 rounded-lg text-[10px]">${s.st}</span></div>
                 </div>
-                <div class="border-t border-gray-100 my-3"></div>
-                <div class="space-y-2">
-                    ${its.map(i => `
-                    <div class="flex justify-between text-[11px]">
-                        <div class="text-left">
-                            <div class="font-bold">${i.n}</div>
-                            <div class="text-[9px] text-gray-400">${i.p.toLocaleString()} x ${i.q}</div>
-                        </div>
-                        <span class="font-bold">${(i.p*i.q).toLocaleString()}</span>
-                    </div>`).join('')}
+
+                <div class="my-4 text-left">
+                    <div class="flex text-[10px] font-bold text-gray-400 uppercase px-1 mb-2">
+                        <span class="flex-1">ລາຍການ</span>
+                        <span class="w-16 text-right">ລວມ</span>
+                    </div>
+                    <div class="space-y-3">
+                        ${its.map(i => `
+                        <div class="flex justify-between text-[12px] items-start">
+                            <div class="text-left flex-1 pr-4">
+                                <div class="font-black text-gray-800">${i.n}</div>
+                                <div class="text-[10px] text-gray-400 font-bold">${i.p.toLocaleString()} x ${i.q}</div>
+                            </div>
+                            <span class="font-black text-gray-900">${(i.p*i.q).toLocaleString()}</span>
+                        </div>`).join('')}
+                    </div>
                 </div>
-                <div class="border-t-2 border-dashed border-gray-200 my-3"></div>
-                <div class="flex justify-between font-bold text-lg text-indigo-900 italic">
-                    <span>ລວມທັງໝົດ:</span>
-                    <span>${s.total.toLocaleString()} ₭</span>
+
+                <div class="border-t-2 border-dashed border-gray-200 my-4"></div>
+                
+                <div class="flex justify-between items-center py-1">
+                    <span class="font-bold text-gray-500 uppercase text-xs">ຍອດລວມທັງໝົດ:</span>
+                    <span class="font-black text-2xl text-indigo-700 tracking-tighter">${s.total.toLocaleString()} ₭</span>
                 </div>
-                <div class="bg-gray-50 p-2 mt-2 rounded-lg space-y-1">
-                    <div class="flex justify-between text-[10px]"><span>ຮັບເງິນ (${s.pm}):</span><span>${s.rec.toLocaleString()}</span></div>
-                    <div class="flex justify-between text-[10px] font-bold"><span>ເງິນທອນ:</span><span>${s.chg.toLocaleString()}</span></div>
+
+                <div class="bg-indigo-900 text-white p-4 mt-4 rounded-[1.5rem] space-y-1 shadow-inner">
+                    <div class="flex justify-between text-[11px] opacity-80"><span>ຊຳລະຜ່ານ (${s.pm}):</span><span>${s.rec.toLocaleString()}</span></div>
+                    <div class="flex justify-between text-[12px] font-black border-t border-white/20 pt-1 mt-1"><span>ເງິນທອນ:</span><span>${s.chg.toLocaleString()} ₭</span></div>
                 </div>
-                <div class="mt-6 text-[10px] font-bold italic opacity-60">
-                    <p>ຂອບໃຈທີ່ມາອຸດໜູນ 🙏🏻</p>
-                    <p class="text-[8px] mt-1">Powered by M4T POS</p>
+
+                <div class="mt-8 text-center">
+                    <div class="inline-block px-4 py-1 border-2 border-gray-900 rounded-full font-black text-[10px] uppercase">Thank You</div>
+                    <p class="text-[9px] mt-2 font-bold text-gray-300">Powered by M4T POS System Professional</p>
                 </div>
             </div>
         </div>`;
     
-    // Wait for images to load if any
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 600)); // Buffer for rendering
     
-    const canvas = await html2canvas(el('r-cap'), { scale: 3, useCORS: true, backgroundColor: "#ffffff" });
-    
-    if (bleCharacteristic) {
-        // Print via Bluetooth
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-        await sendToPrinter(blob);
-    } else {
-        // Auto Download Image
-        const link = document.createElement('a');
-        link.download = `Receipt_${s.id}.png`;
-        link.href = canvas.toDataURL("image/png");
-        link.click();
-        msg("ບັນທຶກໃບບິນລົງເຄື່ອງແລ້ວ");
+    try {
+        const canvas = await html2canvas(el('r-cap'), { 
+            scale: 3, 
+            useCORS: true, 
+            backgroundColor: "#ffffff",
+            logging: false 
+        });
+        
+        if (bleCharacteristic) {
+            const blob = await new Promise(res => canvas.toBlob(res, 'image/png', 0.9));
+            await sendToPrinter(blob);
+        } else {
+            const link = document.createElement('a');
+            link.download = `M4T_Receipt_${s.id}.png`;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+            msg("💾 ບັນທຶກໃບບິນລົງເຄື່ອງແລ້ວ");
+        }
+    } catch (err) {
+        msg("❌ ເກີດຂໍ້ຜິດພາດໃນການສ້າງບິນ", "bg-red-500");
     }
 }
 
-// Remaining helper functions
-function askPass() { if(prompt("ລະຫັດຜ່ານ:") === PASS) openM('adminM'); else msg("ລະຫັດຜິດ!","bg-red-600"); }
+async function sendToPrinter(blob) {
+    if (!bleCharacteristic) return;
+    const buf = await blob.arrayBuffer();
+    const data = new Uint8Array(buf);
+    const step = 120; // MTU Size Optimization
+    for (let i = 0; i < data.length; i += step) {
+        await bleCharacteristic.writeValue(data.slice(i, i + step));
+        await new Promise(r => setTimeout(r, 20)); // Flow control
+    }
+}
+
+// Utility Helpers
+function askPass() { 
+    const p = prompt("🔐 ປ້ອນລະຫັດຜ່ານຜູ້ດູແລ:");
+    if(p === PASS) openM('adminM'); 
+    else if(p !== null) msg("❌ ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ!","bg-red-600"); 
+}
+
 function saveShop() {
     shop = { n: el('s-n').value || shop.n, t: el('s-t').value || shop.t, q: el('s-q').value || shop.q };
-    localStorage.setItem('m4t_shop', JSON.stringify(shop));
-    msg("ບັນທຶກສຳເລັດ"); render(); closeM('shopM');
+    setStore('m4t_shop', shop);
+    msg("✅ ບັນທຶກສຳເລັດ"); render(); closeM('shopM');
 }
+
 function saveProd() {
     const n = el('p-n').value, p = +el('p-p').value, c = el('p-c').value, img = el('p-i').value;
-    if(!n || !p) return msg("ຂໍ້ມູນບໍ່ຄົບ!","bg-red-600");
+    if(!n || !p) return msg("⚠️ ກະລຸນາປ້ອນຊື່ ແລະ ລາຄາ!","bg-red-600");
     items.push({ id: Date.now(), n, p, c: c || 'ອື່ນໆ', img });
-    localStorage.setItem('m4t_items', JSON.stringify(items));
+    setStore('m4t_items', items);
     render(); updPList();
     el('p-n').value = el('p-p').value = el('p-c').value = el('p-i').value = '';
+    msg("📦 ເພີ່ມສິນຄ້າແລ້ວ");
 }
+
 function updPList() {
     el('p-list').innerHTML = items.map(i => `
-        <div class="flex justify-between items-center p-2 bg-gray-50 rounded-lg border">
-            <div class="text-xs"><b>${i.n}</b><br><span class="text-indigo-600">${i.p.toLocaleString()} ₭</span></div>
-            <button onclick="delP(${i.id})" class="text-red-500 text-xs">ລຶບ</button>
-        </div>`).join('');
-}
-function delP(id) { items = items.filter(i=>i.id!==id); localStorage.setItem('m4t_items', JSON.stringify(items)); render(); updPList(); }
-function showHist() {
-    openM('histM');
-    const now = new Date(), mTotal = sales.filter(s => new Date(s.time).getMonth() === now.getMonth()).reduce((a,b)=>a+b.total,0);
-    el('m-summary').innerText = `ເດືອນນີ້: ${mTotal.toLocaleString()} ₭ | ${sales.length} ບິນ`;
-    el('h-list').innerHTML = sales.sort((a,b)=>new Date(b.time)-new Date(a.time)).map(s => `
-        <div class="bg-white p-3 rounded-2xl border flex justify-between items-center shadow-sm">
-            <div class="text-[11px]"><b class="text-indigo-700">${s.cus}</b><br><span class="opacity-50">${new Date(s.time).toLocaleString()}</span></div>
-            <div class="text-right">
-                <b class="text-xs">${s.total.toLocaleString()} ₭</b><br>
-                <div class="flex gap-2 mt-1">
-                    <button onclick="reP('${s.id}')" class="text-indigo-600 text-[10px] bg-indigo-50 px-2 rounded-lg">ເບິ່ງບິນ/ພິມ</button>
-                    <button onclick="delS('${s.id}')" class="text-red-500 text-[10px]">ລຶບ</button>
+        <div class="flex justify-between items-center p-3 bg-white rounded-2xl border border-gray-100 shadow-sm">
+            <div class="flex items-center gap-3">
+                <img src="${i.img || 'https://via.placeholder.com/150'}" class="w-10 h-10 rounded-lg object-cover">
+                <div class="text-xs">
+                    <b class="text-gray-800">${i.n}</b><br>
+                    <span class="text-indigo-600 font-bold">${i.p.toLocaleString()} ₭</span>
                 </div>
             </div>
+            <button onclick="delP(${i.id})" class="w-8 h-8 flex items-center justify-center text-red-400 bg-red-50 rounded-full">✕</button>
         </div>`).join('');
 }
-function delS(id) { if(confirm('ລຶບລາຍການນີ້?')) { sales = sales.filter(s=>s.id!==id); localStorage.setItem('m4t_v3', JSON.stringify(sales)); showHist(); } }
-function reP(id) { const s = sales.find(x => x.id === id); if(s) printProcess(s); }
-function exportData() {
-    const blob = new Blob([JSON.stringify({ items, shop, sales })], {type: 'application/json'});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-    a.download = `m4t_pos_backup.json`; a.click();
+
+function delP(id) { 
+    if(confirm('ລຶບລາຍການນີ້?')) {
+        items = items.filter(i=>i.id!==id); 
+        setStore('m4t_items', items); 
+        render(); updPList(); 
+    }
 }
+
+function showHist() {
+    openM('histM');
+    const now = new Date();
+    const mSales = sales.filter(s => new Date(s.time).getMonth() === now.getMonth());
+    const mTotal = mSales.reduce((a,b)=>a+b.total,0);
+    el('m-summary').innerText = `ເດືອນນີ້: ${mTotal.toLocaleString()} ₭ | ${mSales.length} ບິນ`;
+    
+    el('h-list').innerHTML = sales.length ? sales.sort((a,b)=>new Date(b.time)-new Date(a.time)).map(s => `
+        <div class="bg-white p-4 rounded-2xl border border-gray-100 flex justify-between items-center shadow-sm">
+            <div class="text-[11px]">
+                <b class="text-indigo-700 text-xs">${s.cus}</b>
+                <div class="opacity-50 font-bold">${new Date(s.time).toLocaleString('lo-LA')}</div>
+                <div class="mt-1"><span class="bg-gray-100 px-2 py-0.5 rounded text-[9px]">${s.pm}</span></div>
+            </div>
+            <div class="text-right">
+                <b class="text-sm text-gray-800">${s.total.toLocaleString()} ₭</b>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="reP('${s.id}')" class="text-indigo-600 text-[10px] bg-indigo-50 px-3 py-1 rounded-xl font-bold border border-indigo-100">ພິມຄືນ</button>
+                    <button onclick="delS('${s.id}')" class="text-red-400 text-[10px] font-bold">ລຶບ</button>
+                </div>
+            </div>
+        </div>`).join('') : `<p class="text-center opacity-30 py-10">ບໍ່ມີປະຫວັດການຂາຍ</p>`;
+}
+
+function delS(id) { 
+    if(confirm('ຕ້ອງການລຶບປະຫວັດບິນນີ້?')) { 
+        sales = sales.filter(s=>s.id!==id); 
+        setStore('m4t_v3', sales); 
+        showHist(); 
+    } 
+}
+
+function reP(id) { 
+    const s = sales.find(x => x.id === id); 
+    if(s) { printProcess(s); msg("🧾 ກຳລັງພິມບິນຄືນ..."); } 
+}
+
+function exportData() {
+    const data = JSON.stringify({ items, shop, sales });
+    const blob = new Blob([data], {type: 'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `M4T_POS_BACKUP_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    msg("💾 Backup ສຳເລັດແລ້ວ");
+}
+
 function importData() {
-    const input = document.createElement('input'); input.type = 'file';
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
     input.onchange = e => {
         const reader = new FileReader();
         reader.onload = rs => {
-            const d = JSON.parse(rs.target.result);
-            localStorage.setItem('m4t_items', JSON.stringify(d.items));
-            localStorage.setItem('m4t_shop', JSON.stringify(d.shop));
-            localStorage.setItem('m4t_v3', JSON.stringify(d.sales));
-            location.reload();
+            try {
+                const d = JSON.parse(rs.target.result);
+                setStore('m4t_items', d.items);
+                setStore('m4t_shop', d.shop);
+                setStore('m4t_v3', d.sales);
+                msg("✅ Restore Data ສຳເລັດ!");
+                setTimeout(() => location.reload(), 1000);
+            } catch(e) { msg("❌ ໄຟລ໌ບໍ່ຖືກຕ້ອງ", "bg-red-500"); }
         };
         reader.readAsText(e.target.files[0]);
     };
     input.click();
 }
-function clearAllData() { if(confirm("ຄຳເຕືອນ: ຂໍ້ມູນຈະຖືກລຶບທັງໝົດ!")) { localStorage.clear(); location.reload(); } }
-function msg(m, c='bg-green-600') { 
-    const t = el('toast'); t.innerText = m; 
-    t.className = `fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-3 rounded-full text-white z-[1000] text-xs font-bold ${c}`; 
-    t.classList.remove('hidden'); setTimeout(()=>t.classList.add('hidden'), 2500); 
-}
-function debtTog() { el('dd').classList.toggle('hidden', el('st').value !== 'ຕິດໜີ້'); }
-function setQR(sw) { el('qrM').classList.toggle('hidden', !sw); }
 
-render(); updPList();
-el('s-n').value = shop.n; el('s-t').value = shop.t; el('s-q').value = shop.q;
+function clearAllData() { 
+    if(confirm("❗ ຄຳເຕືອນ: ຂໍ້ມູນທັງໝົດຈະຖືກລຶບຖາວອນ. ຢືນຢັນ?")) { 
+        localStorage.clear(); 
+        location.reload(); 
+    } 
+}
+
+function msg(m, c='bg-green-600') { 
+    const t = el('toast'); 
+    t.innerText = m; 
+    t.className = `fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-3xl text-white z-[1000] text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-bottom-5 ${c}`; 
+    t.classList.remove('hidden'); 
+    setTimeout(()=>t.classList.add('hidden'), 3000); 
+}
+
+function debtTog() { 
+    const isDebt = el('st').value === 'ຕິດໜີ້';
+    el('dd').classList.toggle('hidden', !isDebt); 
+    if(isDebt) el('dd').focus();
+}
+
+function setQR(sw) { 
+    if(sw && !shop.q) {
+        msg("⚠️ ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ QR Code ຮັບເງິນ", "bg-orange-500");
+        return;
+    }
+    el('qrM').classList.toggle('hidden', !sw); 
+}
+
+// Initial Boot
+window.onload = () => {
+    render(); 
+    updPList();
+    el('s-n').value = shop.n; 
+    el('s-t').value = shop.t; 
+    el('s-q').value = shop.q;
+};
 </script>
 </body>
 </html>
